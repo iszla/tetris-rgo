@@ -107,11 +107,10 @@ func (g *Game) Update() {
 				g.Move(1)
 			} else if raylib.IsKeyPressed(raylib.KeyDown) {
 				g.Drop()
-				g.Player.Shape = generateBlock()
 			} else if raylib.IsKeyPressed('Q') {
-				g.Player.Rotate(-1)
+				g.Rotate(-1)
 			} else if raylib.IsKeyPressed('W') {
-				g.Player.Rotate(1)
+				g.Rotate(1)
 			}
 
 			if g.GameTimer > 1000 {
@@ -191,7 +190,7 @@ func reverseMulti(nums [][]int32) [][]int32 {
 	return nums
 }
 
-func (p *PlayerStruct) Rotate(dir int) {
+func (p *PlayerStruct) RotateBlock(dir int) {
 	for y := 0; y < len(p.Shape); y++ {
 		for x := 0; x < y; x++ {
 			p.Shape[y][x], p.Shape[x][y] = p.Shape[x][y], p.Shape[y][x]
@@ -204,6 +203,21 @@ func (p *PlayerStruct) Rotate(dir int) {
 		}
 	} else {
 		p.Shape = reverseMulti(p.Shape)
+	}
+}
+
+func (g *Game) Rotate(dir int) {
+	offset := 1
+	g.Player.RotateBlock(dir)
+	for t := 0; t < 10; t++ {
+		if g.CheckCollissions() {
+			g.Player.Position.X += offset
+			if offset > 0 {
+				offset = -(offset + 1)
+			} else {
+				offset = -(offset - 1)
+			}
+		}
 	}
 }
 
@@ -234,9 +248,30 @@ func (g *Game) NextBlock() {
 		}
 	}
 
+	g.CheckForCompletes()
+
 	g.Player = PlayerStruct{
 		Position: Point{4, 0},
 		Shape:    generateBlock(),
+	}
+}
+
+func (g *Game) CheckForCompletes() {
+	for y := range g.Field {
+		isFull := true
+		for x := range g.Field[0] {
+			if g.Field[y][x] == 0 {
+				isFull = false
+				continue
+			}
+		}
+
+		if isFull {
+			g.Field = append(g.Field[:y], g.Field[y+1:]...)
+			newLine := make([][]int32, 1)
+			newLine[0] = make([]int32, gameWidth)
+			g.Field = append(newLine, g.Field...)
+		}
 	}
 }
 
