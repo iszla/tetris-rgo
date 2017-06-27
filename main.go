@@ -175,11 +175,10 @@ func (g *Game) Drop() {
 }
 
 func (p *PlayerStruct) Rotate(dir int) {
-	o := *p
-	for y := 0; y < len(o.Shape); y++ {
-		for x := 0; x < len(o.Shape); x++ {
+	for y := 0; y < len(p.Shape); y++ {
+		for x := 0; x < len(p.Shape); x++ {
 			fmt.Printf("%d %d\t", p.Shape[y][x], p.Shape[x][y])
-			p.Shape[y][x], p.Shape[x][y] = o.Shape[x][y], o.Shape[y][x]
+			p.Shape[y][x], p.Shape[x][y] = p.Shape[x][y], p.Shape[y][x]
 			fmt.Printf("%d %d\n", p.Shape[y][x], p.Shape[x][y])
 		}
 	}
