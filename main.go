@@ -4,8 +4,6 @@ import (
 	"math/rand"
 	"time"
 
-	"fmt"
-
 	"github.com/gen2brain/raylib-go/raylib"
 )
 
@@ -109,8 +107,9 @@ func (g *Game) Update() {
 				g.Move(1)
 			} else if raylib.IsKeyPressed(raylib.KeyDown) {
 				g.Drop()
-			} else if raylib.IsKeyPressed('Q') {
 				g.Player.Shape = generateBlock()
+			} else if raylib.IsKeyPressed('Q') {
+				g.Player.Rotate(-1)
 			} else if raylib.IsKeyPressed('W') {
 				g.Player.Rotate(1)
 			}
@@ -174,13 +173,37 @@ func (g *Game) Drop() {
 	}
 }
 
+func reverse(numbers []int32) []int32 {
+	for i := 0; i < len(numbers)/2; i++ {
+		j := len(numbers) - i - 1
+		numbers[i], numbers[j] = numbers[j], numbers[i]
+	}
+	return numbers
+}
+
+func reverseMulti(nums [][]int32) [][]int32 {
+	for j := 0; j < len(nums); j++ {
+		for i := 0; i < len(nums)/2; i++ {
+			y := len(nums) - i - 1
+			nums[j][i], nums[j][y] = nums[j][y], nums[j][i]
+		}
+	}
+	return nums
+}
+
 func (p *PlayerStruct) Rotate(dir int) {
 	for y := 0; y < len(p.Shape); y++ {
-		for x := 0; x < len(p.Shape); x++ {
-			fmt.Printf("%d %d\t", p.Shape[y][x], p.Shape[x][y])
+		for x := 0; x < y; x++ {
 			p.Shape[y][x], p.Shape[x][y] = p.Shape[x][y], p.Shape[y][x]
-			fmt.Printf("%d %d\n", p.Shape[y][x], p.Shape[x][y])
 		}
+	}
+
+	if dir > 0 {
+		for x := range p.Shape {
+			p.Shape[x] = reverse(p.Shape[x])
+		}
+	} else {
+		p.Shape = reverseMulti(p.Shape)
 	}
 }
 
@@ -189,12 +212,10 @@ func (g *Game) CheckCollissions() bool {
 		for x := range g.Player.Shape[0] {
 			if g.Player.Shape[y][x] != 0 {
 				if x+g.Player.Position.X >= len(g.Field[0]) || x+g.Player.Position.X < 0 {
-					fmt.Println("Wall")
 					return true
 				} else if y+g.Player.Position.Y == gameHeight {
 					return true
 				} else if g.Field[y+g.Player.Position.Y][x+g.Player.Position.X] > 0 {
-					fmt.Println("Collide")
 					return true
 				}
 			}
@@ -214,7 +235,7 @@ func (g *Game) NextBlock() {
 	}
 
 	g.Player = PlayerStruct{
-		Position: Point{2, 2},
+		Position: Point{4, 0},
 		Shape:    generateBlock(),
 	}
 }
