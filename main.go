@@ -1,8 +1,9 @@
 package main
 
 import (
-	"math/rand"
 	"time"
+
+	"fmt"
 
 	"github.com/gen2brain/raylib-go/raylib"
 )
@@ -34,23 +35,15 @@ type Game struct {
 	GameOver bool
 	Pause    bool
 
-	Time      int64
-	GameTimer int32
+	Time       int64
+	GameTimer  int32
+	TimerLimit int32
+
+	Score int
 
 	Field [][]int32
 
 	Player PlayerStruct
-}
-
-// PlayerStruct is the block in play
-type PlayerStruct struct {
-	Shape    [][]int32
-	Position Point
-}
-
-type Point struct {
-	X int
-	Y int
 }
 
 func main() {
@@ -88,6 +81,7 @@ func (g *Game) Init() {
 
 	g.Time = time.Now().UnixNano()
 	g.GameTimer = -300
+	g.TimerLimit = 1000
 }
 
 // Update the gamestate
@@ -113,9 +107,13 @@ func (g *Game) Update() {
 				g.Rotate(1)
 			}
 
-			if g.GameTimer > 1000 {
+			if g.GameTimer > g.TimerLimit {
 				g.Drop()
 			}
+		}
+	} else {
+		if raylib.IsKeyPressed(raylib.KeyEnter) {
+			g.Init()
 		}
 	}
 }
@@ -126,33 +124,46 @@ func (g *Game) Draw() {
 
 	raylib.ClearBackground(raylib.RayWhite)
 
-	for j := range g.Field {
-		for i := range g.Field[0] {
-			raylib.DrawRectangle(
-				int32(i*blockSize),
-				int32(j*blockSize),
-				blockSize,
-				blockSize,
-				colors[g.Field[j][i]],
-			)
-		}
-	}
-
-	for j := range g.Player.Shape {
-		for i := range g.Player.Shape[0] {
-			if g.Player.Shape[j][i] != 0 {
+	if g.Pause {
+		raylib.DrawText("PAUSED", g.ScreenWidth/2-raylib.MeasureText("PAUSED", 40)/2, g.ScreenHeight/2-40, 40, raylib.Black)
+	} else if g.GameOver {
+		finalScore := fmt.Sprintf("Final Score: %d", g.Score)
+		raylib.DrawText("GAME OVER", g.ScreenWidth/2-raylib.MeasureText("GAME OVER", 38)/2, g.ScreenHeight/2-40, 38, raylib.Black)
+		raylib.DrawText(finalScore, g.ScreenWidth/2-raylib.MeasureText(finalScore, 26)/2, g.ScreenHeight/2, 26, raylib.Black)
+		raylib.DrawText("Press [ENTER] to restart",
+			g.ScreenWidth/2-raylib.MeasureText("Press [ENTER] to restart", 16)/2,
+			g.ScreenHeight/2+30, 16, raylib.Black)
+	} else {
+		for j := range g.Field {
+			for i := range g.Field[0] {
 				raylib.DrawRectangle(
-					int32(i*blockSize+int(g.Player.Position.X*blockSize)),
-					int32(j*blockSize+int(g.Player.Position.Y*blockSize)),
+					int32(i*blockSize),
+					int32(j*blockSize),
 					blockSize,
 					blockSize,
-					colors[g.Player.Shape[j][i]],
+					colors[g.Field[j][i]],
 				)
 			}
-
 		}
-	}
 
+		for j := range g.Player.Shape {
+			for i := range g.Player.Shape[0] {
+				if g.Player.Shape[j][i] != 0 {
+					raylib.DrawRectangle(
+						int32(i*blockSize+int(g.Player.Position.X*blockSize)),
+						int32(j*blockSize+int(g.Player.Position.Y*blockSize)),
+						blockSize,
+						blockSize,
+						colors[g.Player.Shape[j][i]],
+					)
+				}
+
+			}
+		}
+
+		scoreText := fmt.Sprintf("Score: %d", g.Score)
+		raylib.DrawText(scoreText, 5, 5, 14, raylib.White)
+	}
 	raylib.EndDrawing()
 }
 
@@ -169,40 +180,6 @@ func (g *Game) Drop() {
 	if g.CheckCollissions() {
 		g.Player.Position.Y--
 		g.NextBlock()
-	}
-}
-
-func reverse(numbers []int32) []int32 {
-	for i := 0; i < len(numbers)/2; i++ {
-		j := len(numbers) - i - 1
-		numbers[i], numbers[j] = numbers[j], numbers[i]
-	}
-	return numbers
-}
-
-func reverseMulti(nums [][]int32) [][]int32 {
-	for j := 0; j < len(nums); j++ {
-		for i := 0; i < len(nums)/2; i++ {
-			y := len(nums) - i - 1
-			nums[j][i], nums[j][y] = nums[j][y], nums[j][i]
-		}
-	}
-	return nums
-}
-
-func (p *PlayerStruct) RotateBlock(dir int) {
-	for y := 0; y < len(p.Shape); y++ {
-		for x := 0; x < y; x++ {
-			p.Shape[y][x], p.Shape[x][y] = p.Shape[x][y], p.Shape[y][x]
-		}
-	}
-
-	if dir > 0 {
-		for x := range p.Shape {
-			p.Shape[x] = reverse(p.Shape[x])
-		}
-	} else {
-		p.Shape = reverseMulti(p.Shape)
 	}
 }
 
@@ -254,9 +231,14 @@ func (g *Game) NextBlock() {
 		Position: Point{4, 0},
 		Shape:    generateBlock(),
 	}
+
+	if g.CheckCollissions() {
+		g.GameOver = true
+	}
 }
 
 func (g *Game) CheckForCompletes() {
+	lineCount := 0
 	for y := range g.Field {
 		isFull := true
 		for x := range g.Field[0] {
@@ -271,60 +253,16 @@ func (g *Game) CheckForCompletes() {
 			newLine := make([][]int32, 1)
 			newLine[0] = make([]int32, gameWidth)
 			g.Field = append(newLine, g.Field...)
+			lineCount++
 		}
 	}
+
+	g.AddScore(lineCount)
 }
 
-func generateBlock() [][]int32 {
-	switch i := rand.Int31n(7); i {
-	// = block
-	case 0:
-		return [][]int32{
-			[]int32{1, 1},
-			[]int32{1, 1},
-		}
-		// T block
-	case 1:
-		return [][]int32{
-			[]int32{0, 0, 0},
-			[]int32{2, 2, 2},
-			[]int32{0, 2, 0},
-		}
-	//L Block
-	case 2:
-		return [][]int32{
-			[]int32{0, 3, 0},
-			[]int32{0, 3, 0},
-			[]int32{0, 3, 3},
-		}
-	//J Block
-	case 3:
-		return [][]int32{
-			[]int32{0, 4, 0},
-			[]int32{0, 4, 0},
-			[]int32{4, 4, 0},
-		}
-	//S Block
-	case 4:
-		return [][]int32{
-			[]int32{0, 5, 5},
-			[]int32{5, 5, 0},
-			[]int32{0, 0, 0},
-		}
-	//Z Block
-	case 5:
-		return [][]int32{
-			[]int32{6, 6, 0},
-			[]int32{0, 6, 6},
-			[]int32{0, 0, 0},
-		}
-	//I Block
-	default:
-		return [][]int32{
-			[]int32{0, 7, 0, 0},
-			[]int32{0, 7, 0, 0},
-			[]int32{0, 7, 0, 0},
-			[]int32{0, 7, 0, 0},
-		}
+func (g *Game) AddScore(count int) {
+	for i := 0; i < count; i++ {
+		g.Score += 10 * (i + 1)
+		g.GameTimer -= 10
 	}
 }
